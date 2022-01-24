@@ -1,55 +1,223 @@
-import { join } from 'path';
-import { addSideEffect, addDefault, addNamed } from '@babel/helper-module-imports';
-
-function transCamel(_str, symbol) {
-  const str = _str[0].toLowerCase() + _str.substr(1);
-  return str.replace(/([A-Z])/g, $1 => `${symbol}${$1.toLowerCase()}`);
-}
+import { addDefault, addNamed, addNamespace } from '@babel/helper-module-imports';
+const _path = require('path')
+const fs = require('fs');
+const parser = require('@babel/parser');
+const traverse = require('@babel/traverse').default;
 
 function winPath(path) {
   return path.replace(/\\/g, '/');
 }
-
-function normalizeCustomName(originCustomName) {
-  // If set to a string, treat it as a JavaScript source file path.
-  if (typeof originCustomName === 'string') {
-    // eslint-disable-next-line import/no-dynamic-require
-    const customNameExports = require(originCustomName);
-    return typeof customNameExports === 'function' ? customNameExports : customNameExports.default;
-  }
-
-  return originCustomName;
-}
-
 export default class Plugin {
-  constructor(
-    libraryName,
-    libraryDirectory,
-    style,
-    styleLibraryDirectory,
-    customStyleName,
-    camel2DashComponentName,
-    camel2UnderlineComponentName,
-    fileName,
-    customName,
-    transformToDefaultImport,
-    types,
-    index = 0,
-  ) {
+  constructor(libraryName, types, lintCheck, index = 0) {
     this.libraryName = libraryName;
-    this.libraryDirectory = typeof libraryDirectory === 'undefined' ? 'lib' : libraryDirectory;
-    this.camel2DashComponentName =
-      typeof camel2DashComponentName === 'undefined' ? true : camel2DashComponentName;
-    this.camel2UnderlineComponentName = camel2UnderlineComponentName;
-    this.style = style || false;
-    this.styleLibraryDirectory = styleLibraryDirectory;
-    this.customStyleName = normalizeCustomName(customStyleName);
-    this.fileName = fileName || '';
-    this.customName = normalizeCustomName(customName);
-    this.transformToDefaultImport =
-      typeof transformToDefaultImport === 'undefined' ? true : transformToDefaultImport;
+    this.libraryDirectoryName = libraryName.split('/')[0];
+    this.commonLibraryName = `${this.libraryDirectoryName}/iclient-common`
     this.types = types;
+    this.lintCheck = lintCheck
     this.pluginStateKey = `importPluginState${index}`;
+    this.resolvePath = '';
+    this.mainFile = 'index.js'
+    if(!this.lintCheck) {
+      this.resolvePath = './node_modules'; 
+    }
+    this.libraryExportFiles = this.parseModules(`${this.libraryName}`);
+  }
+  getResolvePath(path) {
+    return _path.resolve(this.resolvePath, path);
+  }
+  transformPath(path) {
+    if(!path) {
+      return path;
+    }
+    const index = path.indexOf(`/${this.libraryDirectoryName}/`);
+    return path.substr(index + 1);
+  }
+  getLibraryDirectory(methodName) {
+    const res = this.libraryExportFiles.find(item => {
+      return item.exportName === methodName
+    });
+    const {file, exportDefault, exportExportedName, importAllAsName} = res || {};
+    const path = this.transformPath(file)
+    return { path, methodName: exportExportedName, transformToDefaultImport: exportDefault, importAllAsName }
+  }
+  isFile(path) {
+    try {
+      const stats = fs.statSync(this.getResolvePath(winPath(path)));
+      return stats.isFile()
+    }catch(e){
+      return false;
+    }
+  }
+  getExportEntiry(ast, dirnames, fileName, isExportName, isAddDefault) {
+    const result = [];
+    traverse(ast, {
+      ExportNamedDeclaration: ({node}) => {
+          // export function C(){} || class C(){}  node.declaration.type = FunctionDeclaration|ClassDeclaration
+          if(node.declaration && node.declaration.id) {
+            const exportExportedName = node.declaration.id.name;
+            const entity = { exportExportedName, exportLocalName: exportExportedName, file: fileName, hasSource: false }
+            if (isExportName) {
+              entity.exportName = exportExportedName;
+            }
+            result.push(entity)
+          }
+          //  export const a = 1;
+          if(node.declaration && node.declaration.declarations) {
+            node.declaration.declarations.forEach(declaration=>{
+              const exportExportedName = declaration.id.name;
+              const entity = { exportExportedName, exportLocalName: exportExportedName, file: fileName, hasSource: false }
+              if (isExportName) {
+                entity.exportName = exportExportedName;
+              }
+              result.push(entity)
+            })
+          }
+          // export {xxx}  export {local as exported}  export * as xxx from './xxx'
+          node.specifiers.forEach(specifier=>{
+            const exportExportedName = specifier.exported.name;
+            let entity = { exportExportedName, exportLocalName: specifier.local && specifier.local.name || exportExportedName, file: fileName, hasSource: false }
+            if(node.source) {
+              const sourceValue = node.source.value
+              const file = this.getDirFilePath(sourceValue, dirnames);
+              entity = { ...entity, file, hasSource: true }
+              //  export * as xxx from './xxx'
+              if(!specifier.local) {
+                entity.hasSource = false;
+                entity.importAllAsName = true;
+              }
+            }
+            if (isExportName) {
+              entity.exportName = exportExportedName;
+            }
+            if(entity.exportName === 'default') {
+              entity.exportDefault= true;
+              entity.isExportName = isExportName;
+            }
+            result.push(entity)
+          })
+      },
+      ExportAllDeclaration: ({node}) => {
+        // export * from 'xxx';
+        result.push({ hasExportAll: true, file: this.getDirFilePath(node.source.value, dirnames), hasSource: true })
+      },
+      ExportDefaultDeclaration: ({node}) => {
+        if(isAddDefault) {
+          result.push({ exportDefault: true, file: fileName, isAddDefault });
+        }
+      },
+    })
+    return result;
+  }
+  getEntityInexsByLocalName(exportEntity=[], localName) {
+    // import {A} from 'xxx' export {A, A as B}
+    const res = [];
+    exportEntity && exportEntity.forEach((item, index) => {
+      if(item.exportLocalName === localName){
+        res.push(index)
+      }
+    });
+    return res;
+  }
+  getSource(ast, exportEntity=[], dirnames) {
+    traverse(ast, {
+      ImportDeclaration: ({node}) => {
+        node.specifiers.forEach(specifier=>{
+          const sourceValue = node.source.value
+          const file = this.getDirFilePath(sourceValue, dirnames);
+          const importLocalName = specifier.local.name;
+          const entityIndexs = this.getEntityInexsByLocalName(exportEntity, importLocalName);
+          if (entityIndexs.length > 0) {
+            entityIndexs.forEach((entityIndex)=>{
+              const entity = exportEntity[entityIndex];
+              exportEntity[entityIndex] = { ...entity, file, hasSource: true, importDefault: false, importLocalName: importLocalName, importImportedName: specifier.imported && specifier.imported.name };
+            })
+            if (specifier.type ==='ImportSpecifier') {
+              // import {xxx} from "xxx"  import {xxx as xxx} from "xxx"(imported as local)
+            }
+            if (specifier.type === 'ImportDefaultSpecifier') {
+              // import xxx from "xxx"
+              entityIndexs.forEach((entityIndex)=>{
+                exportEntity[entityIndex].importDefault = true;
+              });
+            }
+            if (specifier.type ==='ImportNamespaceSpecifier') {
+              // import * as xxx from "xxx"
+              entityIndexs.forEach((entityIndex)=>{
+                exportEntity[entityIndex].hasSource = false;
+                exportEntity[entityIndex].importAllAsName = true;
+              });
+            }
+          }
+      })
+      }
+    })
+    return exportEntity;
+  }
+  checkFilePath(abspath) {
+    if(this.isFile(abspath)) {
+      return winPath(abspath)
+    }
+  }
+  getDirFilePath(sourceValue, dirnames) {
+    if (sourceValue.includes(this.commonLibraryName)) {
+      if (this.lintCheck) {
+        sourceValue = sourceValue.replace(this.commonLibraryName, './src/common');
+        const abspath =  _path.join(process.cwd(), sourceValue + '.js')
+        const abspath1 =  _path.join(process.pwd(), sourceValue + 'index.js')
+        return this.checkFilePath(abspath) || this.checkFilePath(abspath1)
+      } else {
+        sourceValue = "../../".concat(sourceValue);
+      }        
+    }
+    const abspath = _path.join(dirnames, sourceValue + '.js');
+    const abspath1 = _path.join(dirnames, sourceValue ,'index.js');
+    const abspath2 = _path.join(dirnames, sourceValue);
+    return this.checkFilePath(abspath) || this.checkFilePath(abspath1) || this.checkFilePath(abspath2);
+  }
+  getModuleInfo(file, isExportName = false, isAddDefault = true){
+    if(!file) {
+      return [];
+    }
+    // 加node_modules;
+    const resolvePath = this.getResolvePath(file);
+    const dirnames = winPath(_path.dirname(resolvePath));
+    const fileContent = fs.readFileSync(resolvePath,'utf-8').toString();
+    const ast = parser.parse(fileContent, {sourceType: 'module'});
+    const exportEntity = this.getExportEntiry(ast, dirnames, file, isExportName, isAddDefault);
+    this.getSource(ast, exportEntity, dirnames);
+    return [...exportEntity];
+  }
+  parseModules(libraryName, mainFile = this.mainFile){
+    const entryFile = `${libraryName}/${mainFile}`
+    let exportEntity = this.getModuleInfo(entryFile, true)
+    // 拿到所有导出的
+    for (let index = 0; index < exportEntity.length; index++) {
+      const entity = exportEntity[index];
+      const { file, hasSource, hasExportAll } = entity;
+      if (hasExportAll && hasSource) {
+        exportEntity.splice(index, 1);
+        exportEntity.push(...this.getModuleInfo(file, true, index === 0))
+        index = index - 1;
+      }
+    }
+    for (let i = 0; i < exportEntity.length; i++) {
+      const entity = exportEntity[i];
+      const { hasSource, file, exportName, importDefault, importImportedName, exportLocalName } = entity;
+      if(hasSource) {
+        const sourceEntity = this.getModuleInfo(file);
+        const newEntity = sourceEntity.find(item => { return (importDefault && item.exportDefault) || ((importImportedName || exportLocalName) === item.exportExportedName)})
+        if (!newEntity) {
+          throw new Error(`${exportName} not found in "${file}"`);
+        } else {
+          if(!newEntity.hasSource) {
+            newEntity.hasSource = false;
+          }
+          exportEntity[i] = {...entity, ...newEntity, exportName};
+          i = i - 1;
+        }
+      }
+    }
+    return exportEntity;
   }
 
   getPluginState(state) {
@@ -61,40 +229,20 @@ export default class Plugin {
 
   importMethod(methodName, file, pluginState) {
     if (!pluginState.selectedMethods[methodName]) {
-      const { style, libraryDirectory } = this;
-      const transformedMethodName = this.camel2UnderlineComponentName // eslint-disable-line
-        ? transCamel(methodName, '_')
-        : this.camel2DashComponentName
-        ? transCamel(methodName, '-')
-        : methodName;
-      const path = winPath(
-        this.customName
-          ? this.customName(transformedMethodName, file)
-          : join(this.libraryName, libraryDirectory, transformedMethodName, this.fileName), // eslint-disable-line
-      );
-      pluginState.selectedMethods[methodName] = this.transformToDefaultImport // eslint-disable-line
-        ? addDefault(file.path, path, { nameHint: methodName })
-        : addNamed(file.path, methodName, path);
-      if (this.customStyleName) {
-        const stylePath = winPath(this.customStyleName(transformedMethodName));
-        addSideEffect(file.path, `${stylePath}`);
-      } else if (this.styleLibraryDirectory) {
-        const stylePath = winPath(
-          join(this.libraryName, this.styleLibraryDirectory, transformedMethodName, this.fileName),
-        );
-        addSideEffect(file.path, `${stylePath}`);
-      } else if (style === true) {
-        addSideEffect(file.path, `${path}/style`);
-      } else if (style === 'css') {
-        addSideEffect(file.path, `${path}/style/css`);
-      } else if (typeof style === 'function') {
-        const stylePath = style(path, file);
-        if (stylePath) {
-          addSideEffect(file.path, stylePath);
-        }
+      const { path: libraryDirectory, methodName: transformedMethodName, transformToDefaultImport, importAllAsName} = this.getLibraryDirectory(methodName);
+      if(!libraryDirectory) {
+        throw new Error(`${methodName} not found in "${this.libraryName}"`);
+      }
+      const path2 = winPath(_path.join.call(void 0, libraryDirectory));
+      if (importAllAsName) {
+        pluginState.selectedMethods[methodName] = addNamespace.call(void 0, file.path, path2, {nameHint: transformedMethodName})
+      } else if(transformToDefaultImport) {
+        pluginState.selectedMethods[methodName] = addDefault.call(void 0, file.path, path2, {nameHint: transformedMethodName})
+      } else {
+        pluginState.selectedMethods[methodName] = addNamed.call(void 0, file.path, transformedMethodName, path2);
       }
     }
-    return { ...pluginState.selectedMethods[methodName] };
+    return {...pluginState.selectedMethods[methodName]};
   }
 
   buildExpressionHandler(node, props, path, state) {
@@ -206,7 +354,6 @@ export default class Plugin {
     if (!node.object || !node.object.name) return;
 
     if (pluginState.libraryObjs[node.object.name]) {
-      // antd.Button -> _Button
       path.replaceWith(this.importMethod(node.property.name, file, pluginState));
     } else if (pluginState.specified[node.object.name] && path.scope.hasBinding(node.object.name)) {
       const { scope } = path.scope.getBinding(node.object.name);

@@ -1,5 +1,5 @@
 {
-  "name": "babel-plugin-import",
+  "name": "@supermap/babel-plugin-import",
   "version": "1.0.0",
   "description": "Component modular import plugin for babel.",
   "repository": {
@@ -8,18 +8,8 @@
   },
   "main": "lib/index.js",
   "scripts": {
-    "build": "father-next",
-    "test": "umi-test --coverage",
-    "debug": "umi-test",
-    "lint": "eslint --ext .js src",
-    "coveralls": "cat ./coverage/lcov.info | coveralls",
-    "prepack": "npm run build",
-    "prepublishOnly": "npm run build && np --no-cleanup --yolo --no-publish --any-branch"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
-    }
+    "build": "gulp",
+    "lint": "eslint --ext .js src"
   },
   "lint-staged": {
     "*.js": [
@@ -29,43 +19,33 @@
   },
   "keywords": [
     "babel-plugin",
-    "antd"
+    "SuperMap"
   ],
-  "author": "chencheng <sorrycc@gmail.com>",
+  "author": "",
   "license": "MIT",
+  "optionalDependencies": {
+    "fsevents": "^2.3.2"
+  },
   "devDependencies": {
-    "@babel/core": "^7.0.0",
-    "@babel/preset-react": "^7.0.0",
-    "@umijs/test": "^3.2.28",
+    "@babel/core": "^7.16.0",
+    "@babel/helper-module-imports": "^7.0.0",
+    "@babel/preset-env": "^7.16.8",
+    "@babel/runtime": "^7.0.0",
     "babel-core": "^7.0.0-0",
-    "babel-preset-umi": "^1.0.0",
-    "coveralls": "^3.0.6",
     "eslint": "^7.1.0",
     "eslint-config-airbnb": "^18.1.0",
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-import": "^2.20.2",
     "eslint-plugin-prettier": "^3.1.3",
-    "father-next": "^3.0.0-alpha.3",
-    "husky": "^4.2.5",
+    "gulp": "^4.0.2",
+    "gulp-babel": "^8.0.0",
     "lint-staged": "^10.2.8",
-    "material-ui": "^0.20.2",
-    "np": "^6.2.0",
-    "prettier": "^2.0.5",
-    "react-toolbox": "^1.2.5"
-  },
-  "babel": {
-    "presets": [
-      "umi"
-    ]
+    "prettier": "^2.0.5"
   },
   "files": [
     "src",
     "lib",
     "package.json",
     "README.md"
-  ],
-  "dependencies": {
-    "@babel/helper-module-imports": "^7.0.0",
-    "@babel/runtime": "^7.0.0"
-  }
+  ]
 }
