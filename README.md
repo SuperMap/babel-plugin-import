@@ -1,6 +1,6 @@
 # @supermap/babel-plugin-import
 
-Modular import plugin for babel, compatible with [@supermap/iclient-leaflet](https://www.npmjs.com/package/@supermap/iclient-leaflet), [@supermap/iclient-mapboxgl](https://www.npmjs.com/package/@supermap/vue-iclient-mapboxgl), [@supermap/iclient-ol](https://www.npmjs.com/package/@supermap/iclient-ol).
+Modular import plugin for babel, compatible with [@supermap/iclient-leaflet](https://www.npmjs.com/package/@supermap/iclient-leaflet), [@supermap/iclient-mapboxgl](https://www.npmjs.com/package/@supermap/iclient-mapboxgl), [@supermap/iclient-ol](https://www.npmjs.com/package/@supermap/iclient-ol).
 
 
 #### `{ "libraryName": "@supermap/iclient-leaflet" }`
