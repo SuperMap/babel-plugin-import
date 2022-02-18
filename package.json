@@ -1,6 +1,6 @@
 {
   "name": "@supermap/babel-plugin-import",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Component modular import plugin for babel.",
   "repository": {
     "type": "git",
@@ -9,6 +9,7 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "gulp",
+    "published": "npm run build && npm publish",
     "lint": "eslint --ext .js src"
   },
   "lint-staged": {
