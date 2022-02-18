@@ -1,6 +1,6 @@
 # @supermap/babel-plugin-import
 
-Modular import plugin for babel, compatible with [@supermap/iclient-leaflet](https://www.npmjs.com/package/@supermap/iclient-leaflet), [@supermap/iclient-mapboxgl](https://www.npmjs.com/package/@supermap/iclient-mapboxgl), [@supermap/iclient-ol](https://www.npmjs.com/package/@supermap/iclient-ol).
+babel的模块化导入插件, 兼容 [@supermap/iclient-leaflet](https://www.npmjs.com/package/@supermap/iclient-leaflet), [@supermap/iclient-mapboxgl](https://www.npmjs.com/package/@supermap/iclient-mapboxgl), [@supermap/iclient-ol](https://www.npmjs.com/package/@supermap/iclient-ol).
 
 
 #### `{ "libraryName": "@supermap/iclient-leaflet" }`
