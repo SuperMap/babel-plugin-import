@@ -1,26 +1,26 @@
-# @supermap/babel-plugin-import
+# @supermapgis/babel-plugin-import
 
-babel的模块化导入插件, 兼容 [@supermap/iclient-leaflet](https://www.npmjs.com/package/@supermap/iclient-leaflet), [@supermap/iclient-mapboxgl](https://www.npmjs.com/package/@supermap/iclient-mapboxgl), [@supermap/iclient-ol](https://www.npmjs.com/package/@supermap/iclient-ol).
+babel的模块化导入插件, 兼容 [@supermapgis/iclient-leaflet](https://www.npmjs.com/package/@supermapgis/iclient-leaflet), [@supermapgis/iclient-mapboxgl](https://www.npmjs.com/package/@supermapgis/iclient-mapboxgl), [@supermapgis/iclient-ol](https://www.npmjs.com/package/@supermapgis/iclient-ol).
 
 
-#### `{ "libraryName": "@supermap/iclient-leaflet" }`
+#### `{ "libraryName": "@supermapgis/iclient-leaflet" }`
 
 ```javascript
-import { Logo } from '@supermap/iclient-leaflet';
+import { Logo } from '@supermapgis/iclient-leaflet';
 new Logo();
 
       ↓ ↓ ↓ ↓ ↓ ↓
 
-var Logo = require('@supermap/iclient-leaflet/control/Logo.js').Logo;
+var Logo = require('@supermapgis/iclient-leaflet/control/Logo.js').Logo;
 new Logo();
 ```
 
 ## Usage
 
-以[@supermap/iclient-leaflet](https://www.npmjs.com/package/@supermap/iclient-leaflet)为例
+以[@supermapgis/iclient-leaflet](https://www.npmjs.com/package/@supermapgis/iclient-leaflet)为例
 
 ```bash
-npm install @supermap/babel-plugin-import --save-dev
+npm install @supermapgis/babel-plugin-import --save-dev
 ```
 
 Via [.babelrc](https://babeljs.io/docs/usage/babelrc/) or [babel-loader](https://github.com/babel/babel-loader/).
@@ -28,7 +28,7 @@ Via [.babelrc](https://babeljs.io/docs/usage/babelrc/) or [babel-loader](https:/
 ```js
 {
   "plugins": [
-    ['@supermap/babel-plugin-import', { libraryName: '@supermap/iclient-leaflet' }]
+    ['@supermapgis/babel-plugin-import', { libraryName: '@supermapgis/iclient-leaflet' }]
   ]
 }
 ```

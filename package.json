@@ -1,6 +1,6 @@
 {
-  "name": "@supermap/babel-plugin-import",
-  "version": "0.0.1",
+  "name": "@supermapgis/babel-plugin-import",
+  "version": "0.0.2",
   "description": "Component modular import plugin for babel.",
   "repository": {
     "type": "git",
